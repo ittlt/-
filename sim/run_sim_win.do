@@ -51,9 +51,9 @@ add wave -radix unsigned /tb_DDS_Signal_Generator/led_key
 add wave -radix unsigned /tb_DDS_Signal_Generator/led_uart
 
 add wave -divider "=== Key_Control Internal ==="
-add wave -radix binary /tb_DDS_Signal_Generator/u_dut/key_ctrl_inst/key_press
-add wave -radix binary /tb_DDS_Signal_Generator/u_dut/key_ctrl_inst/key_valid
-add wave -radix binary /tb_DDS_Signal_Generator/u_dut/key_ctrl_inst/key_sync2
+add wave -radix binary /tb_DDS_Signal_Generator/u_dut/key_ctrl_inst/key_fall
+add wave -radix binary /tb_DDS_Signal_Generator/u_dut/key_ctrl_inst/key_db
+add wave -radix binary /tb_DDS_Signal_Generator/u_dut/key_ctrl_inst/key_in
 add wave -radix unsigned /tb_DDS_Signal_Generator/u_dut/key_ctrl_inst/cnt
 
 add wave -divider "=== DDS Core ==="
