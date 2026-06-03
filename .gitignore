@@ -1,0 +1,40 @@
+# ModelSim 工程文件
+work/
+*.wlf
+*.vstf
+*.mti
+modelsim.ini
+transcript
+vsim_stacktrace.vstf
+
+# 仿真输出
+sim/*.vcd
+sim/work/
+sim/transcript
+sim/wave.vcd
+
+# Quartus 工程文件
+*.qpf
+*.qsf
+*.qws
+*.srf
+*.jdi
+*.pin
+*.summary
+*.done
+*.rpt
+*.smsg
+db/
+incremental_db/
+output_files/
+
+# OS 临时文件
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# 内嵌仓库与工具配置
+-/
+.claude/
