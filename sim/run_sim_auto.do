@@ -1,4 +1,4 @@
-set ROOT "//wsl.localhost/Ubuntu1/home/pyf/github"
+set ROOT "D:/Work_Place/Cursor/claude/DDS_project"
 
 quit -sim
 if {[file exists work]} { vdel -lib work -all }

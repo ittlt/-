@@ -39,3 +39,4 @@ Thumbs.db
 -/
 .claude/
 wave.vcd
+*.bak

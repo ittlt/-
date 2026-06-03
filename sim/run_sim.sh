@@ -2,7 +2,7 @@
 # WSL下运行ModelSim仿真包装脚本（命令行输出版）
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-MODELSIM_EXE="/mnt/d/modelsim2020/modeltech64_2020.4/win64/vsim.exe"
+MODELSIM_EXE="/mnt/d/FPGA_software/Modelsim_2020_4/win64/vsim.exe"
 
 WIN_DIR=$(wslpath -w "$PROJECT_DIR" | sed 's|\\|/|g')
 
