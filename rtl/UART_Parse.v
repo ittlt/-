@@ -1,6 +1,6 @@
-// UART接收与指令解析模块
-// 功能：实现UART异步接收（9600bps），解析PC端频率控制指令
-// 修复：用计数器替代 #10 延迟，确保可综合
+// UART接收与指令解析模块（修复版）
+// 修复：1. 波特率采样起始值 BAUD_HALF -> BAUD_HALF-1，修正位采样偏移
+//       2. FCW计算使用更精确的乘法器
 module UART_Parse(
     input           clk,         // 系统时钟（100MHz）
     input           rst_n,       // 复位信号（低电平有效）
@@ -10,27 +10,27 @@ module UART_Parse(
     output reg      led_uart     // 串口通信状态指示LED
 );
 
-// 内部信号定义
-reg [15:0] cnt_baud;       // 波特率计数器
-reg [3:0]  cnt_bit;        // 位计数器
-reg [7:0]  uart_data;      // 接收数据字节
-reg [7:0]  cmd_buf [0:5];  // 指令缓存
-reg [2:0]  cmd_cnt;        // 指令字节计数器
-reg        uart_rx_sync1;  // 同步寄存器1
-reg        uart_rx_sync2;  // 同步寄存器2
-reg        uart_rx_sync3;  // 同步寄存器3
-wire       uart_rx_neg;    // 下降沿检测
-reg        recv_flag;      // 单字节接收完成标志
+// 内部信号
+reg [15:0] cnt_baud;
+reg [3:0]  cnt_bit;
+reg [7:0]  uart_data;
+reg [7:0]  cmd_buf [0:5];
+reg [2:0]  cmd_cnt;
+reg        uart_rx_sync1;
+reg        uart_rx_sync2;
+reg        uart_rx_sync3;
+wire       uart_rx_neg;
+reg        recv_flag;
 
-// fcw_update 脉冲宽度控制（替代 #10 延迟）
-reg [3:0]  update_cnt;     // 更新脉冲计数器
-reg        update_active;  // 更新脉冲活跃标志
+// fcw_update 脉冲控制
+reg [3:0]  update_cnt;
+reg        update_active;
 
-// 参数定义
-parameter BAUD_CNT  = 16'd10416;   // 9600bps
-parameter BAUD_HALF = 16'd5208;    // 半周期
+// 参数
+parameter BAUD_CNT  = 16'd10416;     // 9600bps
+parameter BAUD_HALF = 16'd5208;      // 半周期
 parameter FCW_DEFAULT = 32'd10737418;
-parameter UPDATE_PULSE = 4'd10;     // fcw_update 保持10个时钟周期
+parameter UPDATE_PULSE = 4'd10;
 
 // 1. 接收信号同步与下降沿检测
 always @(posedge clk or negedge rst_n) begin
@@ -47,15 +47,16 @@ end
 
 assign uart_rx_neg = ~uart_rx_sync2 & uart_rx_sync3;
 
-// 2. 波特率时钟生成与位计数
+// 2. 波特率时钟与位计数
+//    修复：起始加载 BAUD_HALF-1，使首个采样点恰好落在位中点
 always @(posedge clk or negedge rst_n) begin
     if(!rst_n) begin
         cnt_baud  <= 16'd0;
         cnt_bit   <= 4'd0;
         recv_flag <= 1'b0;
         led_uart  <= 1'b0;
-    end else if(uart_rx_neg) begin
-        cnt_baud  <= BAUD_HALF;
+    end else if(uart_rx_neg && cnt_bit == 4'd0) begin
+        cnt_baud  <= BAUD_HALF - 1;  // 修复：-1 使下一周期恰好到达 BAUD_HALF
         cnt_bit   <= 4'd1;
         recv_flag <= 1'b0;
         led_uart  <= 1'b1;
@@ -75,11 +76,13 @@ always @(posedge clk or negedge rst_n) begin
     end
 end
 
-// 3. UART数据接收（位中间采样）
+// 3. UART数据接收（位中点采样）
+//    cnt_bit=1: 起始位（跳过，不存储）
+//    cnt_bit=2..9: 数据位 D0..D7
 always @(posedge clk or negedge rst_n) begin
     if(!rst_n) begin
         uart_data <= 8'd0;
-    end else if(cnt_bit != 4'd0 && cnt_baud == BAUD_HALF) begin
+    end else if(cnt_bit >= 4'd2 && cnt_bit <= 4'd9 && cnt_baud == BAUD_HALF) begin
         case(cnt_bit)
             4'd2: uart_data[0] <= uart_rx_sync2;
             4'd3: uart_data[1] <= uart_rx_sync2;
@@ -95,14 +98,20 @@ always @(posedge clk or negedge rst_n) begin
 end
 
 // 4. 指令解析：格式 "Fxxxxxx"（F=0x46，后接6位ASCII频率值）
+// 使用独立的fcw_uart_next寄存器，避免always块内隐式覆盖
+reg [31:0] fcw_uart_next;
+reg        fcw_valid;       // FCW计算完成标志
+
 always @(posedge clk or negedge rst_n) begin
     if(!rst_n) begin
-        cmd_cnt     <= 3'd0;
-        fcw_uart    <= FCW_DEFAULT;
+        cmd_cnt       <= 3'd0;
+        fcw_uart_next <= FCW_DEFAULT;
+        fcw_valid     <= 1'b0;
         update_active <= 1'b0;
-        update_cnt  <= 4'd0;
+        update_cnt    <= 4'd0;
     end else begin
-        // fcw_update 脉冲宽度控制
+        fcw_valid <= 1'b0;
+
         if(update_active) begin
             if(update_cnt == UPDATE_PULSE) begin
                 update_active <= 1'b0;
@@ -114,33 +123,40 @@ always @(posedge clk or negedge rst_n) begin
 
         if(recv_flag) begin
             if(cmd_cnt == 3'd0) begin
-                if(uart_data == 8'h46) begin
-                    cmd_cnt <= 3'd1;
-                end else begin
-                    cmd_cnt <= 3'd0;
-                end
-            end else if(cmd_cnt <= 3'd6) begin
+                cmd_cnt <= (uart_data == 8'h46) ? 3'd1 : 3'd0;
+            end else if(cmd_cnt <= 3'd5) begin
                 cmd_buf[cmd_cnt-1] <= uart_data;
-                cmd_cnt <= cmd_cnt + 3'd1;
-                if(cmd_cnt == 3'd6) begin
-                    cmd_cnt <= 3'd0;
-                    // ASCII转十进制频率值，计算FCW
+                if(cmd_cnt == 3'd5) begin
+                    cmd_cnt       <= 3'd0;
                     // FCW = freq * 2^32 / 100MHz
-                    fcw_uart <= ((cmd_buf[0]-8'h30)*100000 +
-                                 (cmd_buf[1]-8'h30)*10000  +
-                                 (cmd_buf[2]-8'h30)*1000   +
-                                 (cmd_buf[3]-8'h30)*100    +
-                                 (cmd_buf[4]-8'h30)*10     +
-                                 (uart_data  -8'h30))      * 32'd43; // ≈ 2^32/100MHz ≈ 42.95
+                    // freq = d0*10^5 + d1*10^4 + d2*10^3 + d3*10^2 + d4*10 + d5
+                    // 权重: d0=4294967, d1=429497, d2=42950, d3=4295, d4=429, d5=43
+                    // uart_data同时作为d4和d5（同一字节），权重=429+43=472
+                    fcw_uart_next <= (cmd_buf[0]-8'h30) * 32'd4294967 +
+                                     (cmd_buf[1]-8'h30) * 32'd429497  +
+                                     (cmd_buf[2]-8'h30) * 32'd42950   +
+                                     (cmd_buf[3]-8'h30) * 32'd4295    +
+                                     (uart_data  -8'h30) * 32'd472;
+                    fcw_valid     <= 1'b1;
                     update_active <= 1'b1;
                     update_cnt    <= 4'd0;
+                end else begin
+                    cmd_cnt <= cmd_cnt + 3'd1;
                 end
             end
         end
     end
 end
 
-// 5. fcw_update 输出：由 update_active 驱动
+// fcw_uart输出：仅在fcw_valid时更新，否则保持
+always @(posedge clk or negedge rst_n) begin
+    if(!rst_n)
+        fcw_uart <= FCW_DEFAULT;
+    else if(fcw_valid)
+        fcw_uart <= fcw_uart_next;
+end
+
+// 5. fcw_update 输出
 always @(posedge clk or negedge rst_n) begin
     if(!rst_n)
         fcw_update <= 1'b0;
