@@ -5,7 +5,7 @@
 基于FPGA的DDS（直接数字频率合成）信号发生器，支持正弦波/方波/三角波生成，频率可通过按键或UART串口控制。
 
 **目标平台**：DE2开发板（Cyclone II FPGA），50MHz晶振，8位DAC输出
-**仿真工具**：ModelSim 2020.4（Windows，通过WSL调用）
+**仿真工具**：ModelSim 2020.4（Windows）
 
 ## 目录结构
 
@@ -18,10 +18,11 @@
 ├── tb/
 │   └── tb_DDS_Signal_Generator.v  # 仿真测试台（含行为级PLL模型）
 ├── sim/
-│   ├── run_sim.sh              # WSL一键仿真脚本（推荐）
-│   └── run_sim_win.do          # ModelSim GUI脚本（Windows直接用）
+│   ├── run_sim.sh              # WSL一键仿真脚本
+│   ├── run_sim_win.do          # ModelSim GUI脚本（含波形分组+自动保存wave.do）
+│   └── wave.do                 # 波形配置文件（可直接加载）
 ├── DDS_top.v                   # 原始单文件（历史参考，不参与编译）
-└── .gitignore
+└── CLAUDE.md                   # 本文件
 ```
 
 ## 模块层次
@@ -48,32 +49,48 @@ DDS_Signal_Generator (顶层)
 
 ## 仿真方法
 
-### WSL下运行（推荐）
+### Windows ModelSim（推荐）
+
+```cmd
+D:\FPGA_software\Modelsim_2020_4\win64\vsim.exe -do sim\run_sim_win.do
+```
+
+自动完成：编译RTL → 编译TB → 启动仿真 → 显示分组波形 → 保存wave.do → 运行200ms → 缩放至全部波形。
+
+波形分组：
+1. Clock & Reset
+2. Key Input（青色）
+3. UART（橙色）
+4. DDS Output（绿色）
+5. Key_Control Internal
+6. DDS Core（黄色高亮wave_sel/fcw_sel）
+7. UART Parse
+8. Frequency Select（黄色高亮fcw_sel）
+
+### WSL下运行
 
 ```bash
 bash sim/run_sim.sh
 ```
 
-自动完成：编译RTL → 编译TB → 启动仿真 → 打印测试结果。输出到stdout。
+命令行模式，打印测试结果到stdout。
 
-### Windows ModelSim GUI
+### 加载已保存的波形配置
 
 ```cmd
-D:\modelsim2020\modeltech64_2020.4\win64\vsim.exe -do sim\run_sim_win.do
+do sim\wave.do
 ```
-
-打开波形窗口，可手动添加信号、缩放查看。
 
 ### 测试用例
 
-| 测试 | 内容 | 验证点 |
-|------|------|--------|
-| TEST1 | 默认正弦波 | phase_acc递增，sin_lut正确，dds_out≈128±127 |
-| TEST2 | 按键切换方波 | wave_sel=01，dds_out=0或255 |
-| TEST3 | 按键切换三角波 | wave_sel=10，dds_out线性递增/递减 |
-| TEST4 | Freq+增加频率 | FCW从10737418增加到10844792 |
-| TEST5 | UART F200000 | fcw_uart=8589934，fcw_sel锁定 |
-| TEST6 | 复位 | FCW恢复10737418，wave_sel恢复00 |
+| 测试 | 内容 | 验证点 | 结果 |
+|------|------|--------|------|
+| TEST1 | 默认正弦波 | phase_acc递增，sin_lut正确 | PASS |
+| TEST2 | 按键切换方波 | wave_sel=01 | PASS |
+| TEST3 | 按键切换三角波 | wave_sel=10 | PASS |
+| TEST4 | Freq+增加频率 | FCW: 10737418→10844792 | PASS |
+| TEST5 | UART F200000 | fcw_uart=8589934 | PASS |
+| TEST6 | 复位 | FCW恢复10737418 | PASS |
 
 ## UART指令格式
 
@@ -100,7 +117,7 @@ D:\modelsim2020\modeltech64_2020.4\win64\vsim.exe -do sim\run_sim_win.do
 
 ### Git工作流
 - `main`：主分支，稳定版本
-- `dev-dds-refactor`：开发分支
+- `feature`：功能开发分支
 - 提交前运行仿真确认全部通过
 - 推送到 https://github.com/ittlt/-.git
 
@@ -114,18 +131,4 @@ UART解析中的权重（6位数字 d0~d5）：
 ```
 d0(十万位) × 4294967 + d1(万位) × 429497 + d2(千位) × 42950
 + d3(百位) × 4295 + d4(十位) × 429 + d5(个位) × 43
-```
-
-## 快速上手
-
-```bash
-# 克隆仓库
-git clone https://github.com/ittlt/-.git
-cd -
-
-# 运行仿真（WSL）
-bash sim/run_sim.sh
-
-# 查看波形（如有GTKWave）
-gtkwave wave.vcd
 ```
