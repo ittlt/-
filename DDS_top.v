@@ -309,15 +309,29 @@ Key_Control key_ctrl_inst(
     .wave_sel(wave_sel),
     .led_key(led_key)
 );
-// 4. UART接收与解析模块实例化：接收PC端串口指令，解析生成频率控制字
-UART_Parse uart_parse_inst(
+// 4. HMI串口接收模块实例化：接收PC端串口指令，解析生成频率控制字
+wire [31:0] hmi_num;
+wire hmi_done;
+
+HMI_Recv hmi_recv_inst(
     .clk(clk_100mhz),
     .rst_n(rst_n),
-    .uart_rx(uart_rx),
-    .fcw_uart(fcw_uart),
-    .fcw_update(fcw_update),
-    .led_uart(led_uart)
+    .HMI_RX(uart_rx)
 );
+
+// 将HMI_Num转换为频率控制字
+// HMI_Num是频率值(Hz)，FCW = 频率值 * 2^32 / 100MHz
+always @(posedge clk_100mhz or negedge rst_n) begin
+    if(!rst_n) begin
+        fcw_uart <= 32'd10737418;
+        fcw_update <= 1'b0;
+    end else if(hmi_recv_inst.HMI_Done) begin
+        fcw_uart <= (hmi_recv_inst.HMI_Num << 32) / 100_000_000;
+        fcw_update <= 1'b1;
+    end else begin
+        fcw_update <= 1'b0;
+    end
+end
 // 5. 频率控制字选择逻辑：串口控制优先，当有串口更新标志时选择串口控制字，否则选择按键控制字
 always @(posedge clk_100mhz or negedge rst_n) begin
     if(!rst_n) begin
