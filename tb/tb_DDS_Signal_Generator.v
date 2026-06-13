@@ -53,9 +53,10 @@ initial begin
     $display("操作前FCW=%0d", u_dut.fcw_sel);
     uart_send(8'h46); uart_send(8'h32); uart_send(8'h30);
     uart_send(8'h30); uart_send(8'h30); uart_send(8'h30); uart_send(8'h30);
+    uart_send(8'h0D);  // CR terminator for HMI_Recv
     #2_000_000;
     $display("fcw_uart=%0d, fcw_sel=%0d (期望8589935)",
-             u_dut.uart_parse_inst.fcw_uart, u_dut.fcw_sel);
+             u_dut.hmi_recv_inst.HMI_Num, u_dut.fcw_sel);
 
     // TEST6: 复位
     $display("\n=== TEST6: 复位 ===");
@@ -97,8 +98,10 @@ reg fcw_update_prev;
 Key_Control key_ctrl_inst(.clk(clk_100mhz), .rst_n(rst_n), .key_in(key_in),
     .fcw(fcw_key), .wave_sel(wave_sel), .led_key(led_key));
 
-UART_Parse uart_parse_inst(.clk(clk_100mhz), .rst_n(rst_n), .uart_rx(uart_rx),
-    .fcw_uart(fcw_uart), .fcw_update(fcw_update), .led_uart(led_uart));
+HMI_Recv hmi_recv_inst(.clk(clk_100mhz), .rst_n(rst_n), .HMI_RX(uart_rx),
+    .HMI_Num(fcw_uart), .HMI_Done(fcw_update));
+
+assign led_uart = 1'b0;
 
 // 频率选择：串口更新后锁定，否则跟随按键
 reg fcw_uart_lock;

@@ -5,12 +5,13 @@ module Key_Control(
     input [2:0]     key_in,
     output reg [31:0]fcw,
     output reg [1:0]wave_sel,
-    output reg      led_key
+    output reg      key_vilad,
 );
 
 reg [19:0] cnt [0:2];     // 每个按键独立消抖计数器
 reg [2:0]  key_db;         // 消抖后的按键状态
 reg [2:0]  key_db_prev;    // 上一拍的消抖值（边沿检测用）
+
 integer i;
 
 parameter FCW_DEFAULT = 32'd10737418;
@@ -50,18 +51,18 @@ always @(posedge clk or negedge rst_n) begin
     if(!rst_n) begin
         fcw_reg      <= FCW_DEFAULT;
         wave_sel_reg <= 2'b00;
-        led_key      <= 1'b0;
+        key_vilad    <= 1'b0;
     end else begin
-        led_key <= 1'b0;
+        key_vilad <= 1'b0;
         case(key_fall)
-            3'b001: begin fcw_reg <= fcw_reg + FCW_STEP; led_key <= 1'b1; end
+            3'b001: begin fcw_reg <= fcw_reg + FCW_STEP; key_vilad <= 1'b1; end
             3'b010: begin
                 if(fcw_reg >= FCW_MIN + FCW_STEP) fcw_reg <= fcw_reg - FCW_STEP;
-                led_key <= 1'b1;
+                key_vilad <= 1'b1;
             end
             3'b100: begin
                 wave_sel_reg <= (wave_sel_reg == 2'b10) ? 2'b00 : wave_sel_reg + 2'd1;
-                led_key <= 1'b1;
+                //key_vilad <= 1'b1;
             end
             default: begin fcw_reg <= fcw_reg; wave_sel_reg <= wave_sel_reg; end
         endcase

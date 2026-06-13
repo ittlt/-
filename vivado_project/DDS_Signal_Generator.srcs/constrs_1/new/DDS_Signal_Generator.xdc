@@ -14,9 +14,11 @@ set_property IOSTANDARD LVCMOS33 [get_ports {key_in[1]}]
 set_property PACKAGE_PIN G15 [get_ports {key_in[2]}]
 set_property IOSTANDARD LVCMOS33 [get_ports {key_in[2]}]
 
-## UART串口 - 需要根据实际硬件连接修改
-# set_property PACKAGE_PIN ??? [get_ports uart_rx]
-# set_property IOSTANDARD LVCMOS33 [get_ports uart_rx]
+## UART串口
+set_property PACKAGE_PIN W16 [get_ports uart_rx]
+set_property IOSTANDARD LVCMOS33 [get_ports uart_rx]
+set_property PACKAGE_PIN R17 [get_ports uart_tx]
+set_property IOSTANDARD LVCMOS33 [get_ports uart_tx]
 
 ## 8位DAC输出 - 使用J25扩展接口
 set_property PACKAGE_PIN T11 [get_ports {dds_out[0]}]
@@ -43,3 +45,5 @@ set_property PACKAGE_PIN J16 [get_ports led_key]
 set_property IOSTANDARD LVCMOS33 [get_ports led_key]
 set_property PACKAGE_PIN J14 [get_ports led_sys]
 set_property IOSTANDARD LVCMOS33 [get_ports led_sys]
+set_property PACKAGE_PIN K19 [get_ports led_uart]
+set_property IOSTANDARD LVCMOS33 [get_ports led_uart]

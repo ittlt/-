@@ -10,13 +10,6 @@ output reg [31:0] HMI_Num,	//合并后的数�?�输�??(0~999999)
 output reg HMI_Done		//接收完成脉冲
 );
 
-// ILA IP核实例化 - 用于片上逻辑分析
-ila_0 u_ila (
-    .clk(clk),
-    .probe0(HMI_Num),    // 监控数�?�输�?? [31:0]
-    .probe1(HMI_RX)      // 监控串口接收
-);
-
 wire [7:0]Data_RX;
 wire Wrsig;
 
@@ -59,7 +52,11 @@ case(i)
 	           (dig[4]-8'h30)*32'd429       + (dig[5]-8'h30) * 32'd42;
 	HMI_Done<=1'b1;
 	end
-9:begin//结束�??
+9:begin
+	HMI_Done<=1'b1;
+	i<=10;
+	end
+10:begin//结束??
 	i<=0;
 	HMI_Done<=1'b0;
 	end
